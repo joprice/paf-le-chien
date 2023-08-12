@@ -219,12 +219,12 @@ end
 
 let transmit src dst =
   let rec on_eof () =
-    Httpaf.Body.close_reader src ;
-    Httpaf.Body.close_writer dst
+    Httpaf.Body.Reader.close src ;
+    Httpaf.Body.Writer.close dst
   and on_read buf ~off ~len =
-    Httpaf.Body.write_bigstring dst ~off ~len buf ;
-    Httpaf.Body.schedule_read src ~on_eof ~on_read in
-  Httpaf.Body.schedule_read src ~on_eof ~on_read
+    Httpaf.Body.Writer.write_bigstring dst ~off ~len buf ;
+    Httpaf.Body.Reader.schedule_read src ~on_eof ~on_read in
+  Httpaf.Body.Reader.schedule_read src ~on_eof ~on_read
 
 let connect_http_1_1 ~ctx ~authenticator ~to_close flow reqd =
   let request = Httpaf.Reqd.request reqd in
@@ -238,7 +238,7 @@ let connect_http_1_1 ~ctx ~authenticator ~to_close flow reqd =
         [ "connection", "close" ] in
       let response = Httpaf.Response.create ~reason:"CONNECT" ~headers `OK in
       Httpaf.Reqd.respond_with_string reqd response "" ;
-      Httpaf.Body.close_reader (Httpaf.Reqd.request_body reqd) ;
+      Httpaf.Body.Reader.close (Httpaf.Reqd.request_body reqd) ;
       transmit_over_http ~to_close flow dst
     | Error err ->
       Log.err (fun m -> m "Got an error while connection to %S: %a." uri Mimic.pp_error err) ;
@@ -301,9 +301,9 @@ let http_1_1_request_handler ~ctx ~authenticator ~to_close =
         let response = Httpaf.Response.create ~reason:"random" ~headers `OK in
         let body = Httpaf.Reqd.respond_with_streaming reqd response in
         transmit_random
-          ~write_string:(fun body str -> Httpaf.Body.write_string body str)
+          ~write_string:(fun body str -> Httpaf.Body.Writer.write_string body str)
           ~flush:Httpaf.Body.flush
-          ~close_writer:Httpaf.Body.close_writer
+          ~close_writer:Httpaf.Body.Writer.close
           ?g length body
       | _ ->
         let contents = "Invalid length." in
@@ -454,8 +454,8 @@ let respond_with_string
   let body = respond headers in
   match protocol with
   | Alpn.HTTP_1_1 _ ->
-    Httpaf.Body.write_string body str ;
-    Httpaf.Body.close_writer body
+    Httpaf.Body.Writer.write_string body str ;
+    Httpaf.Body.Writer.close body
   | Alpn.H2 _ ->
     H2.Body.Writer.write_string body str ;
     H2.Body.Writer.close body

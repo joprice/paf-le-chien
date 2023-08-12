@@ -144,7 +144,7 @@ let single_http_1_1_request ?config flow user_pass host meth path headers body =
       wakeup (Ok (response, Some (Buffer.contents buf)))
     and on_read ba ~off ~len =
       Buffer.add_string buf (Bigstringaf.substring ~off ~len ba) ;
-      Httpaf.Body.schedule_read body ~on_read ~on_eof in
+      Httpaf.Body.Reader.schedule_read body ~on_read ~on_eof in
     let on_eof () =
       let response =
         { version= response.Httpaf.Response.version
@@ -152,7 +152,7 @@ let single_http_1_1_request ?config flow user_pass host meth path headers body =
         ; reason = response.Httpaf.Response.reason
         ; headers= H2.Headers.of_list (Httpaf.Headers.to_list response.Httpaf.Response.headers) } in
       wakeup (Ok (response, None)) in
-    Httpaf.Body.schedule_read body ~on_read ~on_eof in
+    Httpaf.Body.Reader.schedule_read body ~on_read ~on_eof in
   let error_handler e =
     let err = match e with
       | `Malformed_response x -> Error (`Msg ("Malformed response: " ^ x))
@@ -162,8 +162,8 @@ let single_http_1_1_request ?config flow user_pass host meth path headers body =
   let request_body, conn = Httpaf.Client_connection.request ?config req ~error_handler
     ~response_handler in
   Lwt.async (fun () -> Paf.run (module HTTP_1_1) conn flow) ;
-  Option.iter (Httpaf.Body.write_string request_body) body ;
-  Httpaf.Body.close_writer request_body ;
+  Option.iter (Httpaf.Body.Writer.write_string request_body) body ;
+  Httpaf.Body.Writer.close request_body ;
   finished
 
 let prepare_h2_headers headers host user_pass body_length =
